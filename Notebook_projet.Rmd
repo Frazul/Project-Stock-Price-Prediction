@@ -3,7 +3,7 @@ title: "R Notebook"
 output: html_notebook
 ---
 ```{r}
-setwd("C:/Users/Toure/Frazul/ENSAI 3A/Projet_ST/Project-Stock-Price-Prediction/Projet_ST")
+setwd("C:/Users/Toure/Frazul/ENSAI 3A/Project-Stock-Price-Prediction/")
 ```
 
 ```{r}
@@ -130,43 +130,166 @@ library(lmtest)
 
 # Fitting the ARIMA(1,1,1) model
 model_111 <- arima(database$Close, order=c(1, 1, 1))
-AR1 <- arima()
+AR1 <- arima(database$Close, order = c(1,0,0))
+MA1 <- arima(database$Close, order = c(0,0,1))
+
+model_212 <- arima(database$Close, order=c(2, 1, 2))
+AR2 <- arima(database$Close, order = c(2,0,0))
+MA2 <- arima(database$Close, order = c(0,0,2))
+
+model_313 <- arima(database$Close, order=c(3, 1, 3))
+AR3 <- arima(database$Close, order = c(3,0,0))
+MA3 <- arima(database$Close, order = c(0,0,3))
 
 # Extract the residuals
-residuals <- residuals(model)
+residuals_111 <- residuals(model_111)
+residuals_AR1 <- residuals(AR1)
+residuals_MA1 <- residuals(MA1)
+
+residuals_212 <- residuals(model_212)
+residuals_AR2 <- residuals(AR2)
+residuals_MA2 <- residuals(MA2)
+
+residuals_313 <- residuals(model_313)
+residuals_AR3 <- residuals(AR3)
+residuals_MA3 <- residuals(MA3)
+
 
 # Check the residuals
-checkresiduals(residuals)
-qqnorm(model$residuals, main="Normal Q-Q Plot")
-qqline(model$residuals)
+checkresiduals(residuals_111)
+qqnorm(model_111$residuals, main="Normal Q-Q Plot")
+qqline(model_111$residuals)
+
+checkresiduals(AR1)
+qqnorm(AR1$residuals, main="Normal Q-Q Plot")
+qqline(AR1$residuals)
+
+checkresiduals(MA1)
+qqnorm(MA1$residuals, main="Normal Q-Q Plot")
+qqline(MA1$residuals)
+
+checkresiduals(model_212)
+qqnorm(model_212$residuals, main="Normal Q-Q Plot")
+qqline(model_212$residuals)
+
+checkresiduals(AR2)
+qqnorm(AR2$residuals, main="Normal Q-Q Plot")
+qqline(AR2$residuals)
+
+checkresiduals(MA2)
+qqnorm(MA2$residuals, main="Normal Q-Q Plot")
+qqline(MA2$residuals)
+
+checkresiduals(model_313)
+qqnorm(model_313$residuals, main="Normal Q-Q Plot")
+qqline(model_313$residuals)
+
+checkresiduals(AR3)
+qqnorm(AR3$residuals, main="Normal Q-Q Plot")
+qqline(AR3$residuals)
+
+checkresiduals(MA3)
+qqnorm(MA3$residuals, main="Normal Q-Q Plot")
+qqline(MA3$residuals)
 # Print the summary of the model
-summary(model)
+summary(model_111)
+summary(AR1)
+summary(MA1)
+
+summary(model_212)
+summary(AR2)
+summary(MA2)
+
+summary(model_313)
+summary(AR3)
+summary(MA3)
 
 # Perform the Jarque-Bera (JB) test
-jb_test <- jarque.bera.test(residuals)
-Ljung_Box_Result <- Box.test(model$residuals, lag = 1, type = "Ljung-Box")
+jb_test_111 <- jarque.bera.test(residuals_111)
+Ljung_Box_Result_111 <- Box.test(model_111$residuals, lag = 1, type = "Ljung-Box")
+jb_test_AR1 <- jarque.bera.test(residuals_AR1)
+Ljung_Box_Result_AR1 <- Box.test(AR1$residuals, lag = 1, type = "Ljung-Box")
+jb_test_MA1 <- jarque.bera.test(residuals_MA1)
+Ljung_Box_Result_MA1 <- Box.test(MA1$residuals, lag = 1, type = "Ljung-Box")
 
+jb_test_212 <- jarque.bera.test(residuals_212)
+Ljung_Box_Result_212 <- Box.test(model_212$residuals, lag = 1, type = "Ljung-Box")
+jb_test_AR2 <- jarque.bera.test(residuals_AR2)
+Ljung_Box_Result_AR2 <- Box.test(AR2$residuals, lag = 1, type = "Ljung-Box")
+jb_test_MA2 <- jarque.bera.test(residuals_MA2)
+Ljung_Box_Result_MA2 <- Box.test(MA2$residuals, lag = 1, type = "Ljung-Box")
+
+jb_test_313 <- jarque.bera.test(residuals_313)
+Ljung_Box_Result_313 <- Box.test(model_313$residuals, lag = 1, type = "Ljung-Box")
+jb_test_AR3 <- jarque.bera.test(residuals_AR3)
+Ljung_Box_Result_AR3 <- Box.test(AR3$residuals, lag = 1, type = "Ljung-Box")
+jb_test_MA3 <- jarque.bera.test(residuals_MA3)
+Ljung_Box_Result_MA3 <- Box.test(MA3$residuals, lag = 1, type = "Ljung-Box")
 # Print the test results
-print(jb_test)
-print(Ljung_Box_Result)
+print(jb_test_111)
+print(Ljung_Box_Result_111)
+print(jb_test_AR1)
+print(Ljung_Box_Result_AR1)
+print(jb_test_MA1)
+print(Ljung_Box_Result_MA1)
 
+print(jb_test_212)
+print(Ljung_Box_Result_212)
+print(jb_test_AR2)
+print(Ljung_Box_Result_AR2)
+print(jb_test_MA2)
+print(Ljung_Box_Result_MA2)
+
+print(jb_test_313)
+print(Ljung_Box_Result_313)
+print(jb_test_AR3)
+print(Ljung_Box_Result_AR3)
+print(jb_test_MA3)
+print(Ljung_Box_Result_MA3)
 
 # Fit a linear regression model for testing heteroscedasticity
-fit <- lm(residuals^2 ~ database$Close)
+fit_111 <- lm(residuals_111^2 ~ database$Close)
+fit_AR1 <- lm(residuals_AR1^2 ~ database$Close)
+fit_MA1 <- lm(residuals_MA1^2 ~ database$Close)
 
+fit_212 <- lm(residuals_212^2 ~ database$Close)
+fit_AR2 <- lm(residuals_AR2^2 ~ database$Close)
+fit_MA2 <- lm(residuals_MA2^2 ~ database$Close)
+
+fit_313 <- lm(residuals_313^2 ~ database$Close)
+fit_AR3 <- lm(residuals_AR3^2 ~ database$Close)
+fit_MA3 <- lm(residuals_MA3^2 ~ database$Close)
 # Perform the Breusch-Pagan test for heteroscedasticity
-hetero_test <- bptest(fit)
+hetero_test_111 <- bptest(fit_111)
+hetero_test_AR1 <- bptest(fit_AR1)
+hetero_test_MA1 <- bptest(fit_MA1)
+
+hetero_test_212 <- bptest(fit_212)
+hetero_test_AR2 <- bptest(fit_AR2)
+hetero_test_MA2 <- bptest(fit_MA2)
+
+hetero_test_313 <- bptest(fit_313)
+hetero_test_AR3 <- bptest(fit_AR3)
+hetero_test_MA3 <- bptest(fit_MA3)
 
 # Print the test results
-print(hetero_test)
+print(hetero_test_111)
+print(hetero_test_AR1)
+print(hetero_test_MA1)
 
+print(hetero_test_212)
+print(hetero_test_AR2)
+print(hetero_test_MA2)
 
+print(hetero_test_313)
+print(hetero_test_AR3)
+print(hetero_test_MA3)
 ```
 
-Le modèle ARIMA(1,1,1) a été ajusté aux données de la série temporelle des prix de clôture. Voici un résumé des résultats :
+Les modèles ARIMA, AR et MA ont été ajusté aux données de la série temporelle des prix de clôture. Voici un résumé des résultats :
 
 Les coefficients pour les termes AR et MA sont très proches de zéro et ne sont pas statistiquement significatifs (p > 0.05), ce qui suggère qu'ils n'apportent pas d'information utile pour le modèle.
-La valeur du critère d'information d'Akaike (AIC) est de 92816.87, ce qui est une mesure de la qualité du modèle ajusté par rapport aux données. Plus le AIC est bas, mieux c'est.
+La valeur du critère d'information d'Akaike (AIC) est de 92801.03, ce qui est une mesure de la qualité du modèle ajusté par rapport aux données. Plus le AIC est bas, mieux c'est.
 Les diagnostics du modèle montrent que les résidus ne suivent pas exactement une distribution normale, comme le suggère le test de Jarque-Bera (JB), et il y a des indications d'hétéroscédasticité.
 Avant de procéder à des prévisions, il serait bon de considérer d'ajuster un modèle différent ou d'explorer d'autres transformations des données qui pourraient améliorer le modèle. Cependant, pour les besoins de cette démonstration, nous allons continuer avec ce modèle pour faire des prévisions à court terme.
 
@@ -175,7 +298,7 @@ Avant de procéder à des prévisions, il serait bon de considérer d'ajuster un
 # Assuming you have loaded the necessary packages
 
 # Forecasting the next 20 days
-forecast <- forecast(model, h=20)
+forecast <- forecast(model_313, h=20)
 
 # Since there is an issue with the index of the forecast, we'll manually construct the dates for the 20-day forecast
 last_date <- tail(as.Date(rownames(database)), n=1)
@@ -212,7 +335,7 @@ ggplot() +
 # Assurez-vous d'avoir chargé les packages nécessaires
 
 # Forecasting the next 20 days
-forecast <- forecast(model, h=20)
+forecast <- forecast(model_313, h=20)
 
 # Since there is an issue with the index of the forecast, we'll manually construct the dates for the 20-day forecast
 last_date <- tail(as.Date(rownames(database)), n=1)
@@ -247,11 +370,12 @@ ggplot() +
   labs(title = "Close Price Forecast for the Next 20 Business Days", x = "Date", y = "Close Price") +
   theme_minimal()
 
+print(forecast_df_final)
 
 ```
 
 Voici les prévisions pour les 20 prochains jours ouvrables pour la série temporelle des prix de clôture, basées sur le modèle ARIMA(1,1,1) :
 
-Le modèle prédit que le prix de clôture restera autour de 6796.77, ce qui indique une tendance constante selon le modèle.
+Le modèle prédit que le prix de clôture restera autour de 6807.479, ce qui indique une tendance constante selon le modèle.
 L'intervalle de confiance montre que la prévision peut varier, avec la limite inférieure et la limite supérieure élargissant légèrement à mesure que l'on se projette dans le futur, reflétant une incertitude croissante dans les prévisions.
 La visualisation montre le prix historique de clôture, ainsi que la prévision et l'intervalle de confiance pour les prochains jours ouvrables. 
