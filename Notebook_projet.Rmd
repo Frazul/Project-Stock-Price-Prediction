@@ -1,7 +1,11 @@
 ---
 title: "R Notebook"
 output: html_notebook
+editor_options: 
+  markdown: 
+    wrap: sentence
 ---
+
 ```{r}
 setwd("C:/Users/Toure/Frazul/ENSAI 3A/Project-Stock-Price-Prediction/")
 ```
@@ -40,7 +44,8 @@ Nous avons chargé la base de données et voici un aperçu de sa structure :
 
 #Type de données : La colonne 'Date' est de type object, ce qui signifie qu'elle pourrait avoir besoin d'être convertie en type de données de date, et les autres colonnes sont de type numérique .
 
-Avec ces informations, nous pouvons procéder à l'analyse des séries temporelles. Comme les données sont des données financières ( un indice boursier), nous allons analyser la colonne 'Close' pour la valeur de clôture journalière.
+Avec ces informations, nous pouvons procéder à l'analyse des séries temporelles.
+Comme les données sont des données financières ( un indice boursier), nous allons analyser la colonne 'Close' pour la valeur de clôture journalière.
 
 Le processus va inclure :
 
@@ -52,7 +57,21 @@ Le processus va inclure :
 #Diagnostic du modèle choisi.
 #Prédiction des valeurs futures.
 
-Je vais maintenant commencer par nettoyer les données et convertir les dates. Ensuite, je visualiserai la série temporelle.
+Je vais maintenant commencer par nettoyer les données et convertir les dates.
+Ensuite, je visualiserai la série temporelle.
+
+```{r}
+# Définir la taille de l'échantillon pour l'ensemble d'apprentissage (par exemple, 70%)
+train_size <- round(nrow(database) * 0.7)
+
+# Sélectionner les premières lignes jusqu'à la taille de l'échantillon pour l'ensemble d'apprentissage
+base_train <- database[1:train_size, ]
+
+# Les lignes restantes constituent l'ensemble de test
+base_test <- database[(train_size + 1):nrow(database), ]
+
+
+```
 
 ```{r}
 # Load the necessary libraries
@@ -62,52 +81,61 @@ library(urca)
 library(xts)
 
 # Convert the 'Date' column to datetime
-database$Date <- as.Date(database$Date)
-
+base_train$Date <- as.Date(base_train$Date)
+base_test$Date <- as.Date(base_test$Date)
 # Set the 'Date' column as the index of the dataframe
-rownames(database) <- database$Date
-database$Date <- NULL
+rownames(base_train) <- base_train$Date
+base_train$Date <- NULL
+
+rownames(base_test) <- base_test$Date
+base_test$Date <- NULL
 
 # Handle missing values by forward filling
-database <- na.locf(database)
+base_train <- na.locf(base_train)
+base_test <- na.locf(base_test)
 
 # Convert 'Close' column to numeric
-database$Close <- as.numeric(as.character(database$Close))
+base_train$Close <- as.numeric(as.character(base_train$Close))
+base_test$Close <- as.numeric(as.character(base_test$Close))
+
 
 # Remove rows with missing values
-database <- na.omit(database)
-
+base_train <- na.omit(base_train)
+base_test <- na.omit(base_test)
 # Visualize the 'Close' price series
-ggplot(data = database, aes(x = as.Date(rownames(database)), y = Close)) +
+ggplot(data = base_train, aes(x = as.Date(rownames(base_train)), y = Close)) +
   geom_line(color = "blue") +
   labs(title = "Close Price Time Series", x = "Date", y = "Close Price") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
 # Perform an Augmented Dickey-Fuller test to check for stationarity
-adf_result <- ur.df(database$Close, type = "drift", lags = 1)
+adf_result <- ur.df(base_train$Close, type = "drift", lags = 1)
 adf_output <- summary(adf_result)
 adf_output@teststat
 adf_output@cval
 
 ```
 
-La visualisation de la série temporelle des prix de clôture montre comment la valeur a changé au fil du temps. Voici quelques conclusions de l'analyse initiale :
+La visualisation de la série temporelle des prix de clôture montre comment la valeur a changé au fil du temps.
+Voici quelques conclusions de l'analyse initiale :
 
-La série temporelle ne semble pas être stationnaire car le test statistique Dickey-Fuller est bien au-dessus des valeurs critiques et la valeur p est supérieure au seuil commun de 0,05. Cela suggère que la série a une structure temporelle qui dépend du temps (comme une tendance ou des effets saisonniers).
+La série temporelle ne semble pas être stationnaire car le test statistique Dickey-Fuller est bien au-dessus des valeurs critiques et la valeur p est supérieure au seuil commun de 0,05.
+Cela suggère que la série a une structure temporelle qui dépend du temps (comme une tendance ou des effets saisonniers).
 En raison de la non-stationnarité de la série temporelle, nous devons la différencier ou utiliser des modèles qui prennent en compte la tendance et la saisonnalité, comme le modèle ARIMA saisonnier, pour la modélisation.
 
-Passons maintenant à la modélisation de la série temporelle. Nous pouvons utiliser un modèle ARIMA après avoir déterminé les paramètres appropriés pour la différenciation (d), l'ordre du terme autoregressif (p) et l'ordre du terme de moyenne mobile (q).
+Passons maintenant à la modélisation de la série temporelle.
+Nous pouvons utiliser un modèle ARIMA après avoir déterminé les paramètres appropriés pour la différenciation (d), l'ordre du terme autoregressif (p) et l'ordre du terme de moyenne mobile (q).
 
-Je vais d'abord déterminer ces paramètres en examinant les fonctions d'autocorrélation (ACF) et d'autocorrélation partielle (PACF) de la série temporelle différenciée. Ensuite, nous pourrons ajuster un modèle ARIMA et évaluer ses performances.
-
+Je vais d'abord déterminer ces paramètres en examinant les fonctions d'autocorrélation (ACF) et d'autocorrélation partielle (PACF) de la série temporelle différenciée.
+Ensuite, nous pourrons ajuster un modèle ARIMA et évaluer ses performances.
 
 ```{r}
 # Load the necessary libraries
 library(forecast)
 
 # Differencing the series to make it stationary
-diff_close <- diff(database$Close)
+diff_close <- diff(base_train$Close)
 diff_close <- diff_close[!is.na(diff_close)]
 
 # Plot ACF and PACF
@@ -117,11 +145,14 @@ ggtsdisplay(diff_close, main="ACF and PACF Plots for Differenced Close Series")
 
 Les graphiques de la fonction d'autocorrélation (ACF) et de la fonction d'autocorrélation partielle (PACF) pour la série différenciée fournissent des indications sur les paramètres à utiliser pour le modèle ARIMA :
 
-ACF : Une décroissance exponentielle ou sinusoïdale après un lag significatif suggère un modèle AR. Dans notre cas, il y a une décroissance après le premier lag.
-PACF : Un arrêt brusque après un lag significatif suggère un modèle MA. Ici, nous observons un arrêt brusque après le premier lag.
+ACF : Une décroissance exponentielle ou sinusoïdale après un lag significatif suggère un modèle AR.
+Dans notre cas, il y a une décroissance après le premier lag.
+PACF : Un arrêt brusque après un lag significatif suggère un modèle MA.
+Ici, nous observons un arrêt brusque après le premier lag.
 Ces observations suggèrent un modèle ARIMA(1,1,1), ce qui signifie un terme AR d'ordre 1, une différenciation d'ordre 1, et un terme MA d'ordre 1.
 
-Je vais maintenant ajuster un modèle ARIMA(1,1,1) à la série temporelle des prix de clôture et vérifier la qualité de l'ajustement. Après cela, nous pourrons réaliser des prévisions.
+Je vais maintenant ajuster un modèle ARIMA(1,1,1) à la série temporelle des prix de clôture et vérifier la qualité de l'ajustement.
+Après cela, nous pourrons réaliser des prévisions.
 
 ```{r}
 # Load the necessary libraries
@@ -129,17 +160,17 @@ library(forecast)
 library(lmtest)
 
 # Fitting the ARIMA(1,1,1) model
-model_111 <- arima(database$Close, order=c(1, 1, 1))
-AR1 <- arima(database$Close, order = c(1,0,0))
-MA1 <- arima(database$Close, order = c(0,0,1))
+model_111 <- arima(base_train$Close, order=c(1, 1, 1))
+AR1 <- arima(base_train$Close, order = c(1,0,0))
+MA1 <- arima(base_train$Close, order = c(0,0,1))
 
-model_212 <- arima(database$Close, order=c(2, 1, 2))
-AR2 <- arima(database$Close, order = c(2,0,0))
-MA2 <- arima(database$Close, order = c(0,0,2))
+model_212 <- arima(base_train$Close, order=c(2, 1, 2))
+AR2 <- arima(base_train$Close, order = c(2,0,0))
+MA2 <- arima(base_train$Close, order = c(0,0,2))
 
-model_313 <- arima(database$Close, order=c(3, 1, 3))
-AR3 <- arima(database$Close, order = c(3,0,0))
-MA3 <- arima(database$Close, order = c(0,0,3))
+model_313 <- arima(base_train$Close, order=c(3, 1, 3))
+AR3 <- arima(base_train$Close, order = c(3,0,0))
+MA3 <- arima(base_train$Close, order = c(0,0,3))
 
 # Extract the residuals
 residuals_111 <- residuals(model_111)
@@ -248,17 +279,17 @@ print(jb_test_MA3)
 print(Ljung_Box_Result_MA3)
 
 # Fit a linear regression model for testing heteroscedasticity
-fit_111 <- lm(residuals_111^2 ~ database$Close)
-fit_AR1 <- lm(residuals_AR1^2 ~ database$Close)
-fit_MA1 <- lm(residuals_MA1^2 ~ database$Close)
+fit_111 <- lm(residuals_111^2 ~ base_train$Close)
+fit_AR1 <- lm(residuals_AR1^2 ~ base_train$Close)
+fit_MA1 <- lm(residuals_MA1^2 ~ base_train$Close)
 
-fit_212 <- lm(residuals_212^2 ~ database$Close)
-fit_AR2 <- lm(residuals_AR2^2 ~ database$Close)
-fit_MA2 <- lm(residuals_MA2^2 ~ database$Close)
+fit_212 <- lm(residuals_212^2 ~ base_train$Close)
+fit_AR2 <- lm(residuals_AR2^2 ~ base_train$Close)
+fit_MA2 <- lm(residuals_MA2^2 ~ base_train$Close)
 
-fit_313 <- lm(residuals_313^2 ~ database$Close)
-fit_AR3 <- lm(residuals_AR3^2 ~ database$Close)
-fit_MA3 <- lm(residuals_MA3^2 ~ database$Close)
+fit_313 <- lm(residuals_313^2 ~ base_train$Close)
+fit_AR3 <- lm(residuals_AR3^2 ~ base_train$Close)
+fit_MA3 <- lm(residuals_MA3^2 ~ base_train$Close)
 # Perform the Breusch-Pagan test for heteroscedasticity
 hetero_test_111 <- bptest(fit_111)
 hetero_test_AR1 <- bptest(fit_AR1)
@@ -286,25 +317,26 @@ print(hetero_test_AR3)
 print(hetero_test_MA3)
 ```
 
-Les modèles ARIMA, AR et MA ont été ajusté aux données de la série temporelle des prix de clôture. Voici un résumé des résultats :
+Les modèles ARIMA, AR et MA ont été ajusté aux données de la série temporelle des prix de clôture.
+Voici un résumé des résultats :
 
-Les coefficients pour les termes AR et MA sont très proches de zéro et ne sont pas statistiquement significatifs (p > 0.05), ce qui suggère qu'ils n'apportent pas d'information utile pour le modèle.
-La valeur du critère d'information d'Akaike (AIC) est de 92801.03, ce qui est une mesure de la qualité du modèle ajusté par rapport aux données. Plus le AIC est bas, mieux c'est.
+Les coefficients pour les termes AR et MA sont très proches de zéro et ne sont pas statistiquement significatifs (p \> 0.05), ce qui suggère qu'ils n'apportent pas d'information utile pour le modèle.
+La valeur du critère d'information d'Akaike (AIC) est de 63756.17, ce qui est une mesure de la qualité du modèle ajusté par rapport aux données.
+Plus le AIC est bas, mieux c'est.
 Les diagnostics du modèle montrent que les résidus ne suivent pas exactement une distribution normale, comme le suggère le test de Jarque-Bera (JB), et il y a des indications d'hétéroscédasticité.
-Avant de procéder à des prévisions, il serait bon de considérer d'ajuster un modèle différent ou d'explorer d'autres transformations des données qui pourraient améliorer le modèle. Cependant, pour les besoins de cette démonstration, nous allons continuer avec ce modèle pour faire des prévisions à court terme.
-
+Avant de procéder à des prévisions, il serait bon de considérer d'ajuster un modèle différent ou d'explorer d'autres transformations des données qui pourraient améliorer le modèle.
+Cependant, pour les besoins de cette démonstration, nous allons continuer avec ce modèle pour faire des prévisions à court terme.
 
 ```{r}
 # Assuming you have loaded the necessary packages
 
-# Forecasting the next 20 days
-forecast <- forecast(model_313, h=20)
-
+# Forecasting the dataset test
+forecast <- forecast(model_313,h=2606)
 # Since there is an issue with the index of the forecast, we'll manually construct the dates for the 20-day forecast
-last_date <- tail(as.Date(rownames(database)), n=1)
+last_date <- tail(as.Date(rownames(base_train)), n=1)
 
 # Generate a list of the next 20 business days excluding weekends
-next_20_days <- seq.Date(as.Date(last_date), by = "day", length.out = 20)
+next_days <- seq.Date(as.Date(last_date), by = "day", length.out = 2606)
 
 # We should now be able to construct the forecast dataframe correctly
 forecast_values <- forecast$mean
@@ -314,68 +346,27 @@ upper_ci_values <- forecast$upper[,2]
 # Create the forecast dataframe with the correct dates
 forecast_df_final <- data.frame(
   Predicted_Close = forecast_values,
+  True_CLose = base_test$Close,
   Lower_CI = lower_ci_values,
   Upper_CI = upper_ci_values,
-  index = next_20_days
+  index = next_days
 )
 # Convert the index to a format that ggplot can handle
 forecast_df_final$index <- as.Date(forecast_df_final$index)
 # Re-plotting the forecast alongside the historical data
 
 ggplot() +
-  geom_line(data = database, aes(x = as.Date(rownames(database)), y = Close), color = "blue", linetype = "solid") +
+  geom_line(data = base_test, aes(x =as.Date(rownames(base_test)) , y = Close), color = "blue", linetype = "solid") +
   geom_line(data = forecast_df_final, aes(x = index, y = Predicted_Close), color = "black", linetype = "solid") +
   geom_ribbon(data = forecast_df_final, aes(x = index, ymin = Lower_CI, ymax = Upper_CI), fill = "green", alpha = 0.3) +
-  labs(title = "Close Price Forecast for the Next 20 Business Days", x = "Date", y = "Close Price") +
-  theme_minimal()
-
-```
-
-```{r}
-# Assurez-vous d'avoir chargé les packages nécessaires
-
-# Forecasting the next 20 days
-forecast <- forecast(model_313, h=20)
-
-# Since there is an issue with the index of the forecast, we'll manually construct the dates for the 20-day forecast
-last_date <- tail(as.Date(rownames(database)), n=1)
-
-# Generate a list of the next 20 business days excluding weekends
-next_20_days <- seq.Date(as.Date(last_date), by = "day", length.out = 20)
-
-# We should now be able to construct the forecast dataframe correctly
-forecast_values <- forecast$mean
-lower_ci_values <- forecast$lower[,2]
-upper_ci_values <- forecast$upper[,2]
-
-# Create the forecast dataframe with the correct dates
-forecast_df_final <- data.frame(
-  Predicted_Close = forecast_values,
-  Lower_CI = lower_ci_values,
-  Upper_CI = upper_ci_values,
-  index = next_20_days
-)
-
-# Convert the index to a format that ggplot can handle
-forecast_df_final$index <- as.Date(forecast_df_final$index)
-
-# Filter the database to keep only the last 100 values
-database_filtered <- tail(database, 100)
-
-# Re-plotting the forecast alongside the historical data
-ggplot() +
-  geom_line(data = database_filtered, aes(x = as.Date(rownames(database_filtered)), y = Close), color = "blue", linetype = "solid") +
-  geom_line(data = forecast_df_final, aes(x = index, y = Predicted_Close), color = "red", linetype = "solid") +
-  geom_ribbon(data = forecast_df_final, aes(x = index, ymin = Lower_CI, ymax = Upper_CI), fill = "green", alpha = 0.3) +
-  labs(title = "Close Price Forecast for the Next 20 Business Days", x = "Date", y = "Close Price") +
+  labs(title = "Close Price Forecast for the Next Business Days", x = "Date", y = "Close Price") +
   theme_minimal()
 
 print(forecast_df_final)
 
 ```
 
-Voici les prévisions pour les 20 prochains jours ouvrables pour la série temporelle des prix de clôture, basées sur le modèle ARIMA(1,1,1) :
+Voici les prévisions pour les prochains jours ouvrables pour la série temporelle des prix de clôture, basées sur le modèle ARIMA(3,1,3) :
 
-Le modèle prédit que le prix de clôture restera autour de 6807.479, ce qui indique une tendance constante selon le modèle.
+Le modèle prédit que le prix de clôture restera autour de 4066.408 , ce qui indique une tendance constante selon le modèle.
 L'intervalle de confiance montre que la prévision peut varier, avec la limite inférieure et la limite supérieure élargissant légèrement à mesure que l'on se projette dans le futur, reflétant une incertitude croissante dans les prévisions.
-La visualisation montre le prix historique de clôture, ainsi que la prévision et l'intervalle de confiance pour les prochains jours ouvrables. 
