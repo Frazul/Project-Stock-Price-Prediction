@@ -1,0 +1,646 @@
+---
+title: "Projet série Temporelles"
+author: "KEUBOU KENFACK Dilane"
+date: "2023-11-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+#setwd(choose.dir())
+```
+
+
+```{r}
+
+# Charger les packages nécessaires
+
+library(ggplot2)
+library(urca)
+library(tseries)
+library(forecast)
+library(rugarch)
+```
+
+```{r}
+# Charger les données
+data <- read.csv("database.csv")
+head(data) # Aperçu des données
+
+```
+
+################################
+## 0. Traitement de la base 
+##############################
+
+
+```{r}
+# Isoler la variable Close
+close <- data[, c('Date','Close')] 
+
+# Vérifier la structure de 'close'
+str(close)
+
+# Vérifier les types de données
+sapply(close, class)
+
+```
+
+
+
+
+
+```{r}
+# Remplacer les valeurs non numériques par NA
+close$Close <- as.character(close$Close)  # Transformera d'abord toutes les valeurs de "Close" en caractères
+close$Close[close$Close == "Null" | close$Close == ""] <- NA  # Remplacez "Null" ou les chaînes vides par NA
+
+# Convertir la colonne 'Close' en numérique
+close$Close <- as.numeric(close$Close)
+
+#Convertir la colonne 'Date' en 'Date' 
+close$Date <- as.Date(close$Date)
+
+# Vérifier la structure après la conversion
+str(close)
+
+# Supprimer les valeurs manquantes 
+
+close<-na.omit(close)
+
+```
+
+
+
+
+####################################
+# 1. Analyse Exploratoire du CAC 40 
+####################################
+
+```{r}
+# Résumé des statistiques descriptives
+ summary(close$Close)
+
+ # Variance and standard deviation 
+variance_close<- sum((close$Close - mean(close$Close))^2) / length(close$Close)
+sd_close<-sqrt(variance)
+```
+
+L'analyse exploratoire de la série temporelle "Close" révèle les informations suivantes :
+
+Nombre total d'observations : 8547
+Moyenne : 4079
+Valeur minimale : 1441
+Valeur maximale : 7577.00
+Médiane : 4114
+
+
+
+
+```{r}
+
+# Graphique de la série temporelle 
+
+p <- ggplot(close, aes(x = Date, y = Close)) +
+  geom_line() +
+  labs(title = "CAC40", x = "Date", y = "Close") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_date(date_breaks = "5 years", date_labels = "%Y")  # Configure l'axe des abscisses pour des périodes de 5 ans
+
+# Afficher le graphique
+print(p)
+
+# Exporter le graphique
+ggsave("Evolution _CAC40.png", p, width = 10, height = 8)
+
+
+```
+
+
+
+
+
+```{r}
+par(mfrow=c(2,2))
+
+
+# Histogramme 
+
+ggplot(close, aes(x = Close)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black") +
+  labs(title = "Histogramme de Close", x = "Close", y = "Fréquence")
+
+
+#Boxplot 
+
+ggplot(close, aes(y = Close)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Boxplot de Close", y = "Close")
+```
+
+On note la présence d'une tendance stochastique dans la série, donc la série semble être non stationnaire. 
+
+La prochaine étape consiste à vérifier statistiquement la stationnarité de cette série, ce qui est crucial pour les modélisations. Pour cela, nous allons utiliser les test Augmenté de Dickey-Fuller (ADF) et KPSS.
+ 
+
+################################################################
+# 2. Autocorréllations et Tests de Stationnarité du CAC 40
+################################################################
+
+```{r}
+#acf(close$Close)
+#pacf(close$Close)
+
+
+#augmented dickey fuller
+adf.test(close$Close) 
+
+
+#KPSS test
+summary(ur.kpss(close$Close)) # l'hypothèse nulle est la stationnarité
+```
+
+Les tests ci-dessus confirment bien que la série est non stationnaire. Nous allons donc modéliser la **série du Rendement**. 
+
+
+
+########################################
+# 3. Série de Rendement du CAC 40
+#######################################
+
+
+
+Le rendement est calculé en utilisant la formule suivante :
+
+$$ R_t = \frac{P_t - P_{t-1}}{P_{t-1}} $$
+
+
+Où :
+- $ R_t $ est le rendement à l'instant t
+- $ P_t $ est le prix à l'instant t
+- $ P_{t-1} $ est le prix à l'instant t-1
+
+
+
+
+
+```{r}
+library(quantmod)
+
+# Convertir le dataframe en objet xts
+close_xts <- xts(close$Close, order.by=as.Date(close$Date))
+
+# Calcul des rendements quotidiens
+returns <- dailyReturn(close_xts)
+
+# Supprimer la première ligne
+#returns <- returns[-1, ]
+
+```
+
+
+
+
+```{r}
+
+returns_df <- fortify.zoo(returns)
+
+```
+
+
+
+### Statistiques descriptives du rendement
+
+```{r}
+
+# Analyse de l'évolution des rendements
+
+library(ggplot2)
+
+R <- ggplot(returns_df, aes(x = Index, y = daily.returns)) +
+  geom_line() +
+  labs(title = "Returns of CAC40", x = "Date", y = "Returns") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_date(date_breaks = "5 years", date_labels = "%Y")
+
+# Afficher le graphique
+print(R)
+
+#Exporter le graphique
+ggsave("Evolution_Rendement_CAC40.png", R, width = 10, height = 8)
+
+
+
+
+```
+
+
+
+
+```{r}
+
+
+# Créer un histogramme avec une courbe de densité
+S<-ggplot(returns_df, aes(x = daily.returns)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.005, fill = "blue", alpha = 0.7) +
+  geom_density(color = "red", size = 1) +
+  labs(title = "Histogram and Density of CAC40 returns",
+       x = "Returns",
+       y = "Density") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+print(S)
+
+```
+
+
+
+
+```{r}
+# Résumé des statistiques descriptives
+ summary(returns_df$daily.returns)
+
+ # Variance and standard deviation 
+variance_Returns<- sum((returns_df$daily.returns - mean(returns_df$daily.returns))^2) / length(returns_df$daily.returns)
+sd_returns<-sqrt(variance_Returns)
+
+
+```
+
+
+
+
+
+```{r}
+# Calcul de l'ACF et du PACF
+acf(returns, main='ACF des rendements')
+pacf(returns, main='PACF des rendements')
+```
+
+
+
+```{r}
+#augmented dickey fuller
+adf.test(returns) 
+
+
+#KPSS test
+summary(ur.kpss(returns))  # l'hypothèse nulle est la stationnarité
+```
+La série est effectivement stationnaire 
+
+
+
+
+################################################################
+# 3. Modélisation GARCH de la Série de Rendement
+################################################################
+
+
+
+## 3.1 Analyse du carré du rendement
+```{r}
+# Carré des rendements
+returns_squared <- returns^2
+
+par(mfrow=c(2,2))
+
+# Tracé de l'évolution du carré des rendements
+plot(returns_squared, main="Évolution du carré des rendements du CAC 40", xlab="Date", ylab="Carré des rendements")
+
+# Calcul de l'ACF et du PACF pour le carré des rendements
+acf(coredata(returns_squared), lag.max=20, main="ACF du carré des rendements")
+pacf(coredata(returns_squared), lag.max=20, main="PACF du carré des rendements")
+
+```
+
+
+
+##3.2 Test d'effet ARCH 
+
+
+```{r}
+library(FinTS)
+ArchTest(returns,lags=12,demean=FALSE)
+```
+D'après le test ci-dessus , il y'a effectivement la présence d'un effet ARCH dans les données, d'où la modélisation GARCH.
+
+## Construction du modèle GARCH(p,q)
+
+
+Le modèle GARCH (Generalized Autoregressive Conditional Heteroskedasticity) est défini par l'équation suivante :
+
+$$ X_t = \sigma_t \cdot \epsilon_t  $$
+
+
+
+$$ \sigma_t^2 = \omega + \sum_{i=1}^{p} \alpha_i \cdot X_{t-i}^2 + \sum_{j=1}^{q} \beta_j \cdot \sigma_{t-j}^2 $$
+
+## 3.3 Division de la base en 80-20
+
+```{r}
+# Calcul de l'index pour diviser les données
+index <- round(length(returns) * 0.8)
+
+# Créer l'ensemble d'entraînement (80% des données)
+returns_train <- returns[1:index]
+
+# Créer l'ensemble de test (20% des données restantes)
+returns_test <- returns[(index+1):length(returns)]
+
+```
+
+
+
+
+
+
+
+
+
+## 3.4 Identifiction de l'ordre de p et q 
+
+
+```{r}
+library(rugarch)
+resultats = matrix(nr=9, nc=6)
+colnames(resultats) = c("p", "q", "Akaike", "Bayes", "Shibata", "Hannan-Quinn")
+i = 0
+for (p in 1:3) {
+  for (q in 1:3) {
+      i=i+1
+      print(paste(p, q))
+      spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(p, q)),
+                     mean.model = list(armaOrder = c(0, 0)),distribution.model = "norm")
+      fit <- ugarchfit(spec, data =returns_train )
+      resultats[i, ] = c(p, q, infocriteria(fit) %>% t())
+}
+}
+print(resultats) # GARCH (2,1)
+
+```
+
+###  Estimation du modèle 
+
+```{r}
+spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(2, 1)),
+                   mean.model = list(armaOrder = c(0, 0)),distribution.model = "norm")
+fit <- ugarchfit(spec, data=returns_train)
+fit
+```
+
+
+
+
+
+##3.5 Validation du modèle 
+
+
+
+```{r}
+library(FinTS)
+
+# Récupérer les résidus
+residuals<- residuals(fit)
+
+
+# Test de normalité ( Test de Jarque-Bera)
+jb_test <- jarque.bera.test(residuals)
+print(jb_test)
+
+# Test d'autocorrélation des résidus (par exemple, le test de Ljung-Box)
+lb_test <- Box.test(residuals, type = "Ljung-Box")
+print(lb_test)
+
+# Test de l'effet ARCH (pour détecter l'autocorrélation dans la volatilité)
+arch_test <- ArchTest(residuals)
+print(arch_test)
+
+# En option, tracer les résidus et leur densité
+par(mfrow = c(2, 1))
+plot(residuals, main = "Résidus")
+hist(residuals, probability = TRUE, main = "Histogramme des Résidus")
+lines(density(residuals), col = "blue", lwd = 2)
+
+```
+```{r}
+## Utilisation des résidus standardisés 
+#residuals_standardized<-residuals(fit, standardize=TRUE)
+#print(jarque.bera.test(residuals))
+
+```
+
+
+
+## 3.6 Performance du modèle
+
+### RMSE du train test et du test set 
+
+
+```{r}
+
+
+# Prédire la volatilité pour l'ensemble d'entraînement
+volatility_forecast_train <- ugarchforecast(fit, n.ahead = length(returns_train))
+predicted_volatility_train <- volatility_forecast_train@forecast$sigmaFor
+residuals_train <- fit@fit$residuals[1:length(returns_train)]
+predicted_returns_train <- predicted_volatility_train * residuals_train
+
+# Prédire la volatilité pour l'ensemble de test
+volatility_forecast_test <- ugarchforecast(fit, n.ahead = length(returns_test), out.sample = length(returns_test))
+predicted_volatility_test <- volatility_forecast_test@forecast$sigmaFor
+residuals_test <- fit@fit$residuals[1:length(returns_test)]
+predicted_returns_test <- predicted_volatility_test * residuals_test
+
+
+# Fonction pour calculer le RMSE
+rmse <- function(observed, predicted) {
+  sqrt(mean((observed - predicted)^2))
+}
+
+# Calculer le RMSE pour l'ensemble d'entraînement
+rmse_train <- rmse(returns_train, predicted_returns_train)
+
+# Calculer le RMSE pour l'ensemble de test
+rmse_test <- rmse(returns_test, predicted_returns_test)
+
+# Afficher les résultats
+print(paste("RMSE pour l'entraînement: ", rmse_train))
+print(paste("RMSE pour le test: ", rmse_test))
+
+
+```
+
+
+### Graphiques des performances sur train set et sur le test set
+```{r}
+# Graphique pour l'ensemble de train et de test
+
+
+
+plot.ts(returns_train)
+lines(predicted_returns_train, type = "l", col = "red")
+
+
+plot.ts(returns_test)
+lines(predicted_returns_test, type = "l", col = "red")
+
+```
+
+
+
+
+
+
+
+## 3.7 Prediction 
+
+### Prédiction à l'horizon 20 jours du rendement 
+
+```{r}
+library(rugarch)
+library(lubridate)
+library(xts)
+
+# Obtenir la dernière date de la série temporelle
+last_date <- index(tail(returns, 1))
+
+# Initialiser les variables
+future_dates <- c()
+date <- last_date+2
+
+# Générer les 20 jours ouvrables suivants en excluant les week-ends
+while(length(future_dates) < 26) {
+    date <- date + days(1)
+    if(!weekdays(date) %in% c("Saturday", "Sunday")) {
+        future_dates <- c(future_dates, date)
+    }
+}
+
+# Prédire la volatilité pour les 20 jours ouvrables suivants
+n_forecast_days <- length(future_dates)
+forecast <- ugarchforecast(fit, n.ahead = n_forecast_days)
+predicted_volatility <- forecast@forecast$sigmaFor
+
+# Utiliser le dernier résidu pour les prédictions
+last_residual <- tail(fit@fit$residuals, 1)
+predicted_returns_future <- predicted_volatility * last_residual
+
+# Créer un objet xts pour les prédictions
+predicted_returns_xts <- xts(predicted_returns_future, order.by = as.Date(future_dates))
+
+# Tracer les prévisions en utilisant plot.xts
+plot.xts(predicted_returns_xts, main = "Returns forecast in 20 days", col = "blue")
+
+
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+## Ajout de la vraie valeur du rendement
+
+future<-read.csv("^FCHI_future.csv")
+
+library(quantmod)
+
+# 
+future<- future[, c('Date','Close')]
+future <- future[1:21, ]
+
+# Convertir le dataframe en objet xts
+future_xts <- xts(future$Close, order.by=as.Date(future$Date))
+
+# Calcul des rendements quotidiens
+future_returns <- dailyReturn(future_xts)
+
+# Supprimer la première ligne
+future_returns <- future_returns[-1, ]
+```
+
+
+
+### Comparaison des valeurs prédites et Actuelles du rendement du CAC 40
+
+```{r}
+library(rugarch)
+library(lubridate)
+library(xts)
+library(quantmod)
+
+# Votre code existant pour générer predicted_returns_future.
+
+# Créer un objet xts pour les prédictions
+predicted_returns_xts <- xts(predicted_returns_future, order.by = as.Date(future_dates))
+
+# Combiner les prédictions et les rendements réels dans un seul objet xts
+combined_xts <- merge(predicted_returns_xts, future_returns, join = "inner")
+
+# Nommer les colonnes pour la clarté
+colnames(combined_xts) <- c("Predicted", "Actual Returns")
+
+# Tracer les deux séries sur le même graphique
+
+par(mar = c(5, 4, 4, 2) + 0.9)
+
+plot(combined_xts, main = "Predicted returns vs actual returns",
+         ylab = "Returns", col = c("blue", "red"))
+legend("bottomright",legend = colnames(combined_xts), col = c("blue", "red"), lty = 1,cex = 0.8)
+
+
+```
+
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(xts)
+
+# Supposons que combined_xts est votre objet xts combiné
+# Convertir en data.frame
+combined_df <- data.frame(date = index(combined_xts), coredata(combined_xts))
+
+# Transformer les données en format long pour ggplot2
+combined_long <- melt(combined_df, id.vars = "date", variable.name = "Type", value.name = "Returns")
+
+# Créer le graphique avec ggplot
+ggplot(combined_long, aes(x = date, y = Returns, color = Type, group = Type)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Predicted returns vs actual returns", y = "Returns", x = "Date") +
+  scale_color_manual(values = c("blue", "red")) +
+  theme(legend.position = "topright")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+### Calcul du RMSE sur la prediction à l'horizon 20 j 
+```{r}
+predicted_returns_future<- predicted_returns_future[1:20, ]
+RMSE_prediction<-rmse(predicted_returns_future,future_returns)
+print(RMSE_prediction)
+```
+
+
+

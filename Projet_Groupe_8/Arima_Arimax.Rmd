@@ -1,0 +1,318 @@
+---
+title: "serieimp"
+author: "fiona"
+date: "2023-11-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(readr)
+database  <- read_csv("C:/Users/fiona/Downloads/database (3).csv", 
+    col_types = cols(Date = col_date(format = "%Y-%m-%d"), 
+        Close = col_number(), `Adj Close` = col_number(), 
+        Volume = col_number()))
+View(database)
+problems(database)
+```
+
+
+```{r pressure, echo=FALSE}
+plot.ts(database$Close)
+```
+
+
+```{r pressure, echo=FALSE}
+str(database$Close)
+database$Close = as.numeric(database$Close)
+series <- na.omit(database$Close)
+series = ts(series)
+acf(series)
+```
+```{r}
+library(tseries)
+kpss_test <- kpss.test(series)
+print(kpss_test)
+adf_test <- adf.test(series)
+print(adf_test)
+```
+
+```{r}
+diff_series <- diff(series)
+plot.ts(diff_series)
+adf_test2 <- adf.test(diff_series)
+print(adf_test2)
+```
+```{r}
+acf(diff_series)
+pacf(diff_series)
+Box.test(diff_series)
+```
+```{r}
+```
+
+
+```{r}
+train_proportion <- 0.8  
+
+
+train_size <- floor(train_proportion * length(series))
+train_index <- 1:train_size
+
+
+train_series <- window(series, end = train_index[length(train_index)])
+
+print(train_series)
+test_series <- window(series, start = train_index[length(train_index)] + 1)
+print(test_series)
+train_exog <- data[1:length(train_series), ]
+test_exog <- data[(length(train_series) + 1):length(series), ]
+
+# Vérifiez les dimensions des ensembles d'entraînement et de test
+length(dim(train_series))
+length(dim(test_series))
+print(dim(train_exog))
+print(dim(test_exog))
+diff_train_series <- diff(train_series)
+diff_test_series <- diff(test_series)
+```
+
+
+```{r}
+```
+
+```{r}
+# Supposons que 'your_time_series' soit votre série temporelle
+
+# Définir les plages pour p, d, q
+p_range <- 0:3
+d_range <- 0:1
+q_range <- 0:3
+
+# Initialiser une liste pour stocker les résultats
+models_list <- list()
+
+# Explorer différentes combinaisons d'ordres (p, d, q) et stocker les modèles et AIC
+for (p in p_range) {
+  for (d in d_range) {
+    for (q in q_range) {
+      tryCatch({
+        model <- arima(series, order=c(p, d, q), method="ML")
+         current_aic <- AIC(model)
+         current_bic <- BIC(model)
+        models_list[[paste(c(p, d, q), collapse = ",")]] <- list(order=c(p, d, q), aic=current_aic, bic=current_bic)
+      }, error = function(e) {})
+    }
+  }
+}
+for (model_info in models_list) {
+  print(paste("Ordre ARIMA :", paste(model_info$order, collapse = ","), "AIC :", model_info$aic, "BIC :", model_info$bic))
+}
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+library(TTR)
+
+# Fonction pour calculer le RSI
+calculateRSI <- function(prices, n = 10) {
+  price_diff <- diff(prices)
+  gains <- ifelse(price_diff > 0, price_diff, 0)
+  losses <- ifelse(price_diff < 0, -price_diff, 0)
+  avg_gains <- SMA(gains, n = n)
+  avg_losses <- SMA(losses, n = n)
+  rs <- avg_gains / avg_losses
+  rsi <- 100 - (100 / (1 + rs))
+  return(rsi)
+}
+
+
+# Calcul du RSI
+rsi_values <- calculateRSI(train_series)
+plot.ts(rsi_values)
+
+ # Création d'un nouveau dataset avec la colonne "Close" et la colonne du RSI
+new_dataset <- data.frame(Close = diff_train_series, RSI = c(rsi_values), SMA = c(diff_moy_mob))
+
+# Affichage du nouveau dataset
+View(new_dataset)
+length(rsi_values)
+```
+
+```{r}
+library(zoo)
+library(forecast)
+
+
+window_size = 10
+sma_exogenous <- rollmean(train_series, k = window_size, fill = NA)
+diff_moy_mob = diff(sma_exogenous)
+#View(diff_moy_mob)
+# Afficher la série temporelle originale et la moyenne mobile simple
+plot(diff_train_series, type="l", col="blue", lwd=2, ylab="Value", main="Série temporelle et Moyenne Mobile Simple")
+lines(diff_moy_mob, col="red", lwd=2)
+legend("topright", legend=c("series", "SMA"), col=c("blue", "red"), lwd=2)
+```
+
+```{r}
+new_dataset <- na.omit(new_dataset)
+arimax_model1 <- arima(new_dataset$Close, order= c(3,1,3))
+#arimax_model1 <- arima(new_dataset$Close, order= c(3,1,3), xreg=new_dataset[,3:3], method="ML")
+checkresiduals(arimax_model1)
+Box.test(arimax_model1$residuals)
+summary(arimax_model1)
+arimax_model1$aic
+adf.test(arimax_model1$residuals)
+```
+```{r}
+forecast_values <- forecast(arimax_model1, h= 1710)
+length(test_series)
+rmse = sqrt(mean((test_series - forecast_values$mean)^2))
+print(forecast_values)
+plot(forecast_values, main = "Prévisions avec ARIMAX sur l'échantillon de test")
+lines(test_series, col = "blue", lty = 2)
+```
+
+```{r}
+#database <- read_csv("C:/Users/fiona/Downloads/database (2).csv", col_types = cols(Close = col_number()))
+#database <- na.omit(database)
+
+# Trier la base de données par date (si ce n'est pas déjà le cas)
+#database <- database %>% arrange(Date)
+#database$Date <- as.Date(database$Date)
+
+database <- database %>% mutate(Rendement = (Close - lag(Close)) / lag(Close))
+
+plot.ts(database$Rendement)
+#series1 <- na.omit(database$Rendement)
+
+#series1 = ts(series1)
+#plot.ts(series1)
+#acf(series1)
+#pacf(series1)
+```
+
+```{r}
+library(zoo)
+
+database$Trimestre <- as.yearqtr(database$Date)
+
+rendements_trimestriels <- aggregate(Rendement ~ Trimestre, database, mean, na.rm = TRUE)
+
+Close_trim <- aggregate(Close ~ Trimestre, database, mean, na.rm = TRUE)
+
+plot.ts(Close_trim$Close)
+
+plot.ts(rendements_trimestriels$Rendement)
+
+adf_test3 <- adf.test(rendements_trimestriels$Rendement)
+
+
+print(adf_test3)
+View(rendements_trimestriels)
+```
+
+```{r}
+library(readxl)
+pib_vol <- read_excel("C:/Users/fiona/Downloads/pib_vol.xlsx", 
+    skip = 2)
+
+pib_vol <- pib_vol %>%
+  mutate(Date = seq(as.Date("1949-01-01"), length.out = n(), by = "3 months"))
+
+pib_vol <- pib_vol %>% mutate(croissancePIB = (PIB - lag(PIB)) / lag(PIB))
+
+plot.ts(pib_vol$croissancePIB)
+
+pib_vol <- subset(pib_vol, Date >= "1990-01-01")
+
+rendements_trimestriels <- subset(rendements_trimestriels, Trimestre < "2023 Q4")
+```
+
+
+```{r}
+library(tidyverse)
+library(zoo)
+df1 <- rendements_trimestriels %>%
+  mutate(AnneeTrim = paste(substr(Trimestre, 1, 4), "T", substr(Trimestre, 7, 7), sep = ""))
+merged_data <- merge(df1, pib_vol, by.x = "AnneeTrim", by.y = "...1", all = TRUE)
+View(merged_data)
+
+new_data <- data.frame(rendement_trim = merged_data$Rendement, croissance_pib = merged_data$croissancePIB)
+```
+
+```{r}
+train_proportion <- 0.8  
+
+
+train_size <- floor(train_proportion * length(new_data$rendement_trim))
+train_index <- 1:train_size
+
+
+train_series1 <- window(new_data$rendement_trim, end = train_index[length(train_index)])
+
+
+test_series1 <- window(new_data$rendement_trim, start = train_index[length(train_index)] + 1)
+
+train_exog1 <- new_data$croissance_pib[1:length(train_series1)]
+test_exog1 <- new_data$croissance_pib[(length(train_series1) + 1):length(new_data$rendement_trim)]
+
+# Vérifiez les dimensions des ensembles d'entraînement et de test
+print(length(test_series1))
+print(dim(test_series1))
+View(train_exog1)
+print(dim(test_exog1))
+
+```
+
+```{r}
+ggplot(merged_data, aes(x = Trimestre)) +
+  geom_line(aes(y = Rendement, color = "Rendement"), linewidth = 1) +
+  geom_line(aes(y = croissancePIB, color = "Croissance PIB"), linewidth = 1) +
+  labs(title = "Évolution des variables",
+       x = "Date",
+       y = "Valeur") +
+  scale_color_manual(values = c("Rendement" = "blue", "Croissance PIB" = "red")) +
+  theme_minimal() 
+```
+```{r}
+ggplot() +
+  geom_line(data = Close_trim, aes(x = Trimestre, y = Close, color = "Close"), linewidth = 1) +
+  geom_line(data = merged_data, aes(x = Trimestre, y = PIB*10, color = "PIB"), linewidth = 1) +
+  labs(title = "Évolution des variables",
+       x = "Date",
+       y = "Valeur") +
+  scale_color_manual(values = c( "Close" = "green", "PIB" = "red")) +
+  theme_minimal()
+```
+```{r}
+ccf_result <- ccf(merged_data$Rendement, merged_data$croissancePIB)
+```
+
+
+```{r}
+arimax_model <- Arima(train_series1, order= c(3,0,3), xreg=lag(train_exog1,1), method="ML")
+
+arimax_model
+checkresiduals(arimax_model)
+test_results <- coeftest(arimax_model)
+
+# Affichez les résultats
+print(test_results)
+```
+
+
+
+```{r}
+print(forecast_values1)
+forecast_values1 <- forecast(arimax_model, xreg = lag(test_exog1,1))
+rmse = sqrt(mean((test_series1 - forecast_values1$mean)^2))
+print(forecast_values1)
+plot(forecast_values1, main = "Prévisions avec ARIMAX sur l'échantillon de test")
+lines(new_data$rendement_trim, col = "red", lty = 2)
+```
