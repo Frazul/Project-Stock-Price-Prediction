@@ -10,6 +10,8 @@ editor_options:
 setwd("C:/Users/Toure/Frazul/ENSAI 3A/Project-Stock-Price-Prediction/")
 ```
 
+## 1. Préparation de la base de donnée
+
 ```{r}
 # Load the necessary library
 library(tidyverse)
@@ -34,35 +36,11 @@ print(database_info)
 
 ```
 
-Nous avons chargé la base de données et voici un aperçu de sa structure :
-
-#Colonnes : La base de données contient 7 colonnes - 'Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', et 'Volume'.
-
-#Entrées : Il y a un total de 8694 entrées dans la base de données.
-
-#Données manquantes : Les colonnes 'Open', 'High', 'Low', 'Close', 'Adj Close', et 'Volume' ont des valeurs manquantes.
-
-#Type de données : La colonne 'Date' est de type object, ce qui signifie qu'elle pourrait avoir besoin d'être convertie en type de données de date, et les autres colonnes sont de type numérique .
-
-Avec ces informations, nous pouvons procéder à l'analyse des séries temporelles.
-Comme les données sont des données financières ( un indice boursier), nous allons analyser la colonne 'Close' pour la valeur de clôture journalière.
-
-Le processus va inclure :
-
-#Nettoyage des données pour gérer les valeurs manquantes.
-#Conversion de la colonne 'Date' en type datetime.
-#Indexer le dataframe par la colonne 'Date' pour une série temporelle.
-#Visualisation de la série temporelle.
-#Modélisation de la série temporelle (par exemple, avec un modèle ARIMA).
-#Diagnostic du modèle choisi.
-#Prédiction des valeurs futures.
-
-Je vais maintenant commencer par nettoyer les données et convertir les dates.
-Ensuite, je visualiserai la série temporelle.
+## 2. Définition de l'échantillon de test et train
 
 ```{r}
-# Définir la taille de l'échantillon pour l'ensemble d'apprentissage (par exemple, 70%)
-train_size <- round(nrow(database) * 0.7)
+# Définir la taille de l'échantillon pour l'ensemble d'apprentissage (par exemple, 80%)
+train_size <- round(nrow(database) * 0.8)
 
 # Sélectionner les premières lignes jusqu'à la taille de l'échantillon pour l'ensemble d'apprentissage
 base_train <- database[1:train_size, ]
@@ -72,6 +50,8 @@ base_test <- database[(train_size + 1):nrow(database), ]
 
 
 ```
+
+## 3. Affichage de la série temporelle
 
 ```{r}
 # Load the necessary libraries
@@ -117,18 +97,7 @@ adf_output@cval
 
 ```
 
-La visualisation de la série temporelle des prix de clôture montre comment la valeur a changé au fil du temps.
-Voici quelques conclusions de l'analyse initiale :
-
-La série temporelle ne semble pas être stationnaire car le test statistique Dickey-Fuller est bien au-dessus des valeurs critiques et la valeur p est supérieure au seuil commun de 0,05.
-Cela suggère que la série a une structure temporelle qui dépend du temps (comme une tendance ou des effets saisonniers).
-En raison de la non-stationnarité de la série temporelle, nous devons la différencier ou utiliser des modèles qui prennent en compte la tendance et la saisonnalité, comme le modèle ARIMA saisonnier, pour la modélisation.
-
-Passons maintenant à la modélisation de la série temporelle.
-Nous pouvons utiliser un modèle ARIMA après avoir déterminé les paramètres appropriés pour la différenciation (d), l'ordre du terme autoregressif (p) et l'ordre du terme de moyenne mobile (q).
-
-Je vais d'abord déterminer ces paramètres en examinant les fonctions d'autocorrélation (ACF) et d'autocorrélation partielle (PACF) de la série temporelle différenciée.
-Ensuite, nous pourrons ajuster un modèle ARIMA et évaluer ses performances.
+## 4. Tester la stationarité de la série
 
 ```{r}
 # Load the necessary libraries
@@ -143,16 +112,7 @@ ggtsdisplay(diff_close, main="ACF and PACF Plots for Differenced Close Series")
 
 ```
 
-Les graphiques de la fonction d'autocorrélation (ACF) et de la fonction d'autocorrélation partielle (PACF) pour la série différenciée fournissent des indications sur les paramètres à utiliser pour le modèle ARIMA :
-
-ACF : Une décroissance exponentielle ou sinusoïdale après un lag significatif suggère un modèle AR.
-Dans notre cas, il y a une décroissance après le premier lag.
-PACF : Un arrêt brusque après un lag significatif suggère un modèle MA.
-Ici, nous observons un arrêt brusque après le premier lag.
-Ces observations suggèrent un modèle ARIMA(1,1,1), ce qui signifie un terme AR d'ordre 1, une différenciation d'ordre 1, et un terme MA d'ordre 1.
-
-Je vais maintenant ajuster un modèle ARIMA(1,1,1) à la série temporelle des prix de clôture et vérifier la qualité de l'ajustement.
-Après cela, nous pourrons réaliser des prévisions.
+## 5. Modèle ARIMA
 
 ```{r}
 # Load the necessary libraries
@@ -317,26 +277,19 @@ print(hetero_test_AR3)
 print(hetero_test_MA3)
 ```
 
-Les modèles ARIMA, AR et MA ont été ajusté aux données de la série temporelle des prix de clôture.
-Voici un résumé des résultats :
-
-Les coefficients pour les termes AR et MA sont très proches de zéro et ne sont pas statistiquement significatifs (p \> 0.05), ce qui suggère qu'ils n'apportent pas d'information utile pour le modèle.
-La valeur du critère d'information d'Akaike (AIC) est de 63756.17, ce qui est une mesure de la qualité du modèle ajusté par rapport aux données.
-Plus le AIC est bas, mieux c'est.
-Les diagnostics du modèle montrent que les résidus ne suivent pas exactement une distribution normale, comme le suggère le test de Jarque-Bera (JB), et il y a des indications d'hétéroscédasticité.
-Avant de procéder à des prévisions, il serait bon de considérer d'ajuster un modèle différent ou d'explorer d'autres transformations des données qui pourraient améliorer le modèle.
-Cependant, pour les besoins de cette démonstration, nous allons continuer avec ce modèle pour faire des prévisions à court terme.
+## 6. Prédiction sur le modèle ARIMA
 
 ```{r}
 # Assuming you have loaded the necessary packages
 
 # Forecasting the dataset test
-forecast <- forecast(model_313,h=2606)
+forecast <- forecast(model_313 ,h=1738)
+
 # Since there is an issue with the index of the forecast, we'll manually construct the dates for the 20-day forecast
 last_date <- tail(as.Date(rownames(base_train)), n=1)
 
 # Generate a list of the next 20 business days excluding weekends
-next_days <- seq.Date(as.Date(last_date), by = "day", length.out = 2606)
+next_days <- seq.Date(as.Date(last_date), by = "day", length.out = 1738)
 
 # We should now be able to construct the forecast dataframe correctly
 forecast_values <- forecast$mean
@@ -357,8 +310,8 @@ forecast_df_final$index <- as.Date(forecast_df_final$index)
 
 ggplot() +
   geom_line(data = base_test, aes(x =as.Date(rownames(base_test)) , y = Close), color = "blue", linetype = "solid") +
-  geom_line(data = forecast_df_final, aes(x = index, y = Predicted_Close), color = "black", linetype = "solid") +
-  geom_ribbon(data = forecast_df_final, aes(x = index, ymin = Lower_CI, ymax = Upper_CI), fill = "green", alpha = 0.3) +
+  geom_line(data = forecast_df_final, aes(x = as.Date(rownames(base_test)), y = Predicted_Close), color = "black", linetype = "solid") +
+  geom_ribbon(data = forecast_df_final, aes(x = as.Date(rownames(base_test)), ymin = Lower_CI, ymax = Upper_CI), fill = "green", alpha = 0.3) +
   labs(title = "Close Price Forecast for the Next Business Days", x = "Date", y = "Close Price") +
   theme_minimal()
 
@@ -370,3 +323,137 @@ Voici les prévisions pour les prochains jours ouvrables pour la série temporel
 
 Le modèle prédit que le prix de clôture restera autour de 4066.408 , ce qui indique une tendance constante selon le modèle.
 L'intervalle de confiance montre que la prévision peut varier, avec la limite inférieure et la limite supérieure élargissant légèrement à mesure que l'on se projette dans le futur, reflétant une incertitude croissante dans les prévisions.
+
+```{r}
+accuracy(model_313,test = base_test$Close)
+```
+
+## 7. Modèle Xgboost
+
+```{r}
+library(xgboost)
+dtrain <- xgb.DMatrix(data = as.matrix(base_train$Close), label = base_train$Close)
+dtest <- xgb.DMatrix(data = as.matrix(base_test$Close), label = base_test$Close)
+
+# Supposons que 'Close' est la colonne cible à prédire
+target_column <- "Close"
+
+# Définir les paramètres du modèle
+params <- list(
+  objective = "reg:squarederror",  # Objectif de régression
+  max_depth = 5,                   # Profondeur maximale de l'arbre
+  eta = 0.1,                       # Taux d'apprentissage
+  gamma = 0,                       # Paramètre de pénalisation de l'arbre
+  subsample = 0.8,                 # Sous-échantillonnage des observations
+  colsample_bytree = 0.8           # Sous-échantillonnage des colonnes
+)
+
+
+
+# Entraînement du modèle
+xgb_model <- xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = 100,
+  watchlist = list(train = dtrain),
+  early_stopping_rounds = 10,
+  verbose = 1
+)
+
+
+# Évaluation sur l'ensemble de test
+predictions_xgb <- predict(xgb_model, dtest)
+
+# Évaluer la performance (par exemple, RMSE)
+rmse <- sqrt(mean((base_test[[target_column]] - predictions_xgb)^2))
+
+print(paste("RMSE on train set:", xgb_model$best_score))
+print(paste("RMSE on test set:", rmse))
+
+
+
+
+
+
+```
+
+## 8. Prédiction sur le modèle Xgboost
+
+```{r}
+
+last_date <- tail(as.Date(rownames(base_train)), n=1)
+
+# Generate a list of the next 20 business days excluding weekends
+next_days <- database$Date[1:nrow(base_test)]
+# Create the forecast dataframe with the correct dates
+forecast_df_xgb <- data.frame(
+  Predicted_Close = predictions_xgb,
+  True_CLose = base_test$Close,
+  index = next_days
+)
+# Convert the index to a format that ggplot can handle
+forecast_df_xgb$index <- as.Date(forecast_df_xgb$index)
+# Re-plotting the forecast alongside the historical data
+
+graphe <- ggplot() +
+  geom_line(data = base_test, aes(x =as.Date(rownames(base_test)) , y = Close), color = "blue", linetype = "solid") +
+  geom_line(data = forecast_df_xgb, aes(x = as.Date(rownames(base_test)), y = Predicted_Close), color = "red", linetype = "solid") +
+  labs(title = "Close Price Forecast for the Next Business Days", x = "Date", y = "Close Price") +
+  theme_minimal()
+graphe
+```
+
+```{r}
+last_date <- tail(as.Date(rownames(base_test)), n=1)
+last_train <- tail(as.Date(rownames(base_train)), n=1)
+data1 <- read.csv("^FCHI (3).csv")
+data1$Date <- as.Date(data1$Date)
+
+# Generate a list of the next 20 business days excluding weekends
+next_days_20 <- seq.Date(as.Date(last_date), by = "day", length.out = 20)
+future_data <- data.frame(Days = next_days_20)
+# Convertir les données futures en objet xgb.DMatrix
+d_future <- xgb.DMatrix(data = as.matrix(future_data$Days), label = future_data$Days)
+
+# Faire des prédictions pour les données futures
+predictions_future <- predict(xgb_model, d_future)
+
+date_test <- as.Date(rownames(base_test))
+size_4 <- nrow(base_test) + 20
+
+base_complet <- data.frame()
+base_complet[1:nrow(base_test),"Close"] <- base_test[,"Close"]
+base_complet[1:nrow(base_test),"Predictions"] <- predictions_xgb
+base_complet[1:nrow(base_test),"Date"] <- date_test
+base_complet[(nrow(base_test)+1) : size_4,"Close"] <- data1$Close
+base_complet[(nrow(base_test)+1) : size_4,"Predictions"] <- predictions_future
+base_complet[(nrow(base_test)+1) : size_4,"Date"] <- data1$Date
+
+
+base_complet$Date <- as.Date(base_complet$Date)
+ggplot() +
+  geom_line(data = base_complet, aes(x =Date, y = Close), color = "blue", linetype = "solid") +
+  geom_line(data = base_complet, aes(x = Date, y = Predictions), color = "red", linetype = "solid") +
+  labs(title = "Close Price Forecast for the Next Business Days", x = "Date", y = "Close Price") +
+  theme_minimal()
+```
+
+```{r}
+
+# Sélectionner les 40 dernières valeurs de complet_data
+last_40_values <- tail(base_complet, 40)
+
+# Convertir la colonne Days en objet Date si ce n'est pas déjà fait
+last_40_values$Date <- as.Date(last_40_values$Date)
+
+# Visualisation des 40 dernières valeurs
+gaphe <- ggplot() +
+  geom_line(data = last_40_values, aes(x = Date, y = Close), color = "blue", linetype = "solid") +
+  geom_line(data = last_40_values, aes(x = Date, y = Predictions), color = "red", linetype = "solid") +
+  labs(title = "Close Price Forecast for the Last 40 Business Days",
+       x = "Date", y = "Close Price") +
+  theme_minimal()
+gaphe
+rmse <- sqrt(mean((predictions_future - data1$Close)^2))
+print(paste("RMSE :", rmse))
+```
